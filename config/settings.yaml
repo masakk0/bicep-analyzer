@@ -1,0 +1,32 @@
+# config/settings.yaml
+# ─────────────────────────────────────────────
+# Bicep Twin — configurazione principale
+# ─────────────────────────────────────────────
+
+llm:
+  # LiteLLM provider/model syntax. Set real credentials in .env, never here.
+  # Examples: openai/gpt-4.1-mini, anthropic/claude-sonnet-4-5, ollama/llama3.1
+  model: openai/gpt-4.1-mini
+  api_base: null
+  api_version: null
+  temperature: 0.2
+  max_tokens: 2048
+
+agent:
+  max_iterations: 10          # Maximum tool calls per turn
+  verbose: true               # Show agent reasoning in the UI
+  system_prompt: |
+    You are a cloud architect specializing in Azure and Bicep infrastructure.
+    You can use tools to query the infrastructure graph.
+    Always answer in English. Be precise, technical, and concise.
+    When you identify a problem, always propose a concrete Bicep solution.
+
+graph:
+  layout_iterations: 100      # Force-directed layout iterations
+  node_radius: 44
+
+ui:
+  title: "Bicep Twin"
+  subtitle: "Infrastructure Reasoning"
+  theme: dark
+  port: 8501

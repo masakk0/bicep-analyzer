@@ -1,0 +1,137 @@
+# config/risk_rules.yaml
+# ─────────────────────────────────────────────
+# Customizable risk rules
+# Each rule can be enabled or disabled
+# without changing the code.
+# ─────────────────────────────────────────────
+
+rules:
+
+  - id: public_network_access
+    enabled: true
+    severity: high           # high | medium | low | info
+    category: network
+    name: "Public access enabled"
+    description: >
+      A resource has publicNetworkAccess not set to 'Disabled'.
+      This exposes the service to the internet without using a Private Endpoint.
+    check:
+      type: property_match
+      property: publicNetworkAccess
+      not_equals: "Disabled"
+    fix_template: |
+      properties: {
+        publicNetworkAccess: 'Disabled'
+      }
+
+  - id: ai_no_private_endpoint
+    enabled: true
+    severity: high
+    category: security
+    name: "AI Service without Private Endpoint"
+    description: >
+      An AI service (CognitiveServices / OpenAI / ML Workspace) has no
+      associated Private Endpoint. Traffic travels over the public internet.
+    check:
+      type: missing_dependency
+      resource_categories: [ai]
+      requires_linked: network:private_endpoint
+    fix_template: |
+      resource aiPrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-04-01' = {
+        name: '${aiService.name}-pe'
+        location: location
+        properties: {
+          subnet: { id: '${vnet.id}/subnets/pe-subnet' }
+          privateLinkServiceConnections: [{
+            name: 'ai-connection'
+            properties: {
+              privateLinkServiceId: aiService.id
+              groupIds: ['account']
+            }
+          }]
+        }
+      }
+
+  - id: storage_no_private_endpoint
+    enabled: true
+    severity: medium
+    category: security
+    name: "Storage Account without Private Endpoint"
+    description: >
+      A Storage Account has no associated Private Endpoint.
+    check:
+      type: missing_dependency
+      resource_categories: [storage]
+      requires_linked: network:private_endpoint
+    fix_template: |
+      resource storagePrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-04-01' = {
+        name: '${storageAccount.name}-pe'
+        location: location
+        properties: {
+          subnet: { id: '${vnet.id}/subnets/pe-subnet' }
+          privateLinkServiceConnections: [{
+            name: 'storage-connection'
+            properties: {
+              privateLinkServiceId: storageAccount.id
+              groupIds: ['blob']
+            }
+          }]
+        }
+      }
+
+  - id: function_no_vnet
+    enabled: true
+    severity: medium
+    category: network
+    name: "Function App not integrated with a VNet"
+    description: >
+      A Function App or App Service has no virtualNetworkSubnetId configured.
+      Calls to resources protected by a Private Endpoint will fail.
+    check:
+      type: missing_property
+      resource_types: [compute]
+      resource_labels: ["Function / App"]
+      missing_property: virtualNetworkSubnetId
+    fix_template: |
+      properties: {
+        virtualNetworkSubnetId: '${vnet.id}/subnets/app-subnet'
+      }
+
+  - id: function_calls_ai_no_retry
+    enabled: true
+    severity: info
+    category: reliability
+    name: "Function calls AI: verify retry policy"
+    description: >
+      A Function App references an AI service in its app settings.
+      Verify that suitable timeouts and a retry policy are configured
+      to handle model cold starts and throttling.
+    check:
+      type: property_contains
+      resource_types: [compute]
+      property: appSettings
+      contains_any: ["cognitiveservices", "AI_ENDPOINT", "openai", "OPENAI"]
+
+  - id: keyvault_no_private_endpoint
+    enabled: true
+    severity: medium
+    category: security
+    name: "Key Vault without Private Endpoint"
+    description: >
+      A Key Vault has no associated Private Endpoint.
+    check:
+      type: missing_dependency
+      resource_categories: [security]
+      requires_linked: network:private_endpoint
+
+  - id: no_vnet_defined
+    enabled: true
+    severity: high
+    category: network
+    name: "No VNet defined"
+    description: >
+      The template contains no Virtual Network.
+      All resources may be publicly exposed.
+    check:
+      type: missing_resource_category
+      category: network

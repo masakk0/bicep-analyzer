@@ -1,0 +1,1605 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Bicep Twin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Geist+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+<style>
+/* ─────────────────────────────────────────────────────
+   DESIGN SYSTEM
+   Inspired by: Vercel, Linear, Stripe Dashboard
+   - Pure black (#080c14) base, not navy
+   - Single accent: teal #14F5D4
+   - Inter for UI, Geist Mono for code/data
+   - Cards with subtle glass, NO harsh borders
+   - Generous spacing, tight typography
+───────────────────────────────────────────────────── */
+:root {
+  --bg:        #080c14;
+  --bg1:       #0b1120;
+  --bg2:       #0f172a;
+  --bg3:       #1e2d47;
+  --bg4:       #243452;
+
+  --teal:      #14f5d4;
+  --teal-10:   rgba(20,245,212,0.10);
+  --teal-20:   rgba(20,245,212,0.20);
+  --teal-glow: rgba(20,245,212,0.30);
+
+  --red:       #f43f5e;
+  --red-10:    rgba(244,63,94,0.10);
+  --amber:     #f59e0b;
+  --amber-10:  rgba(245,158,11,0.10);
+  --blue:      #60a5fa;
+  --violet:    #a78bfa;
+  --green:     #34d399;
+
+  --t1: rgba(255,255,255,0.95);
+  --t2: rgba(255,255,255,0.55);
+  --t3: rgba(255,255,255,0.28);
+  --t4: rgba(255,255,255,0.12);
+
+  --glass:        rgba(15,23,42,0.75);
+  --glass-border: rgba(255,255,255,0.07);
+  --glass-hover:  rgba(255,255,255,0.05);
+
+  --ui:   'Inter', system-ui, sans-serif;
+  --mono: 'Geist Mono', 'SF Mono', monospace;
+
+  /* node palette */
+  --c-compute:   #14f5d4;
+  --c-network:   #60a5fa;
+  --c-storage:   #fbbf24;
+  --c-ai:        #c084fc;
+  --c-security:  #f87171;
+  --c-database:  #34d399;
+  --c-messaging: #f472b6;
+  --c-unknown:   #6b7280;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%; overflow: hidden;
+  background: var(--bg);
+  color: var(--t1);
+  font-family: var(--ui);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--t4); border-radius: 99px; }
+
+/* ═══════════════════════════════════════════
+   LAYOUT
+═══════════════════════════════════════════ */
+#shell { display: flex; flex-direction: column; height: 100vh; }
+
+/* ── Header ──────────────────────────────── */
+#hdr {
+  display: flex; align-items: center;
+  height: 54px; padding: 0 20px; gap: 0;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0; z-index: 100;
+}
+
+.logo { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.logo-mark {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, var(--teal) 0%, #7c3aed 100%);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; flex-shrink: 0;
+  box-shadow: 0 0 16px rgba(20,245,212,0.25);
+}
+.logo-text {
+  font-size: 15px; font-weight: 650; letter-spacing: -0.4px;
+  color: var(--t1);
+}
+.logo-badge {
+  font-family: var(--mono); font-size: 9px; color: var(--t3);
+  background: var(--glass-hover);
+  border: 1px solid var(--glass-border);
+  padding: 1px 6px; border-radius: 4px;
+}
+
+.hdr-div { width: 1px; height: 22px; background: var(--glass-border); margin: 0 20px; flex-shrink: 0; }
+
+/* Stats */
+#hdr-stats { display: flex; align-items: center; gap: 28px; }
+.hstat { display: flex; flex-direction: column; gap: 1px; }
+.hstat-n {
+  font-size: 18px; font-weight: 700;
+  letter-spacing: -0.8px; line-height: 1;
+  color: var(--t1);
+}
+.hstat-n.red { color: var(--red); }
+.hstat-l { font-size: 9px; font-weight: 500; color: var(--t3); letter-spacing: 0.06em; text-transform: uppercase; }
+.hstat-vnet { display: flex; align-items: center; gap: 6px; }
+.vnet-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.vnet-dot.ok  { background: var(--green); box-shadow: 0 0 8px var(--green); animation: dp 2s ease infinite; }
+.vnet-dot.err { background: var(--red);   box-shadow: 0 0 8px var(--red);   animation: dp 0.7s ease infinite; }
+@keyframes dp { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+.hdr-right { display: flex; align-items: center; gap: 7px; margin-left: auto; }
+
+/* ── Buttons ─────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-hover);
+  color: var(--t2);
+  font-family: var(--ui); font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all 0.14s;
+  white-space: nowrap; letter-spacing: -0.1px;
+  outline: none;
+}
+.btn:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.12); color: var(--t1); }
+.btn:active { transform: scale(0.97); }
+.btn-sm { padding: 5px 10px; font-size: 11px; border-radius: 6px; }
+.btn-primary {
+  background: var(--teal); border-color: var(--teal);
+  color: #040e0c; font-weight: 650;
+  box-shadow: 0 0 20px rgba(20,245,212,0.2);
+}
+.btn-primary:hover { background: #2df8d9; color: #040e0c; box-shadow: 0 0 28px rgba(20,245,212,0.35); border-color: #2df8d9; }
+.btn-primary.loading { opacity: 0.65; pointer-events: none; }
+.btn-ghost { background: transparent; border-color: transparent; color: var(--t3); }
+.btn-ghost:hover { background: var(--glass-hover); border-color: var(--glass-border); color: var(--t2); }
+.btn-danger { color: var(--red); border-color: rgba(244,63,94,0.25); background: var(--red-10); }
+.btn-danger:hover { border-color: rgba(244,63,94,0.5); background: rgba(244,63,94,0.15); color: #fb7185; }
+.btn-icon { padding: 6px 8px; }
+
+/* ── Body ────────────────────────────────── */
+#body { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+/* Left panel — editor */
+#left {
+  width: 256px; flex-shrink: 0;
+  background: var(--bg1);
+  border-right: 1px solid var(--glass-border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+
+/* Center — graph */
+#center { flex: 1; position: relative; overflow: hidden; background: var(--bg); }
+
+/* Right panel */
+#right {
+  width: 300px; flex-shrink: 0;
+  background: var(--bg1);
+  border-left: 1px solid var(--glass-border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+
+/* ── Panel header ── */
+.ph { padding: 14px 16px 10px; border-bottom: 1px solid var(--glass-border); flex-shrink: 0; }
+.ph-label { font-size: 10px; font-weight: 600; color: var(--t3); letter-spacing: 0.08em; text-transform: uppercase; }
+.scroll { flex: 1; overflow-y: auto; padding: 8px; }
+
+/* ══════════════════════════════════════════
+   EDITOR
+══════════════════════════════════════════ */
+#editor-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+#editor {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: rgba(74,222,128,0.88); font-family: var(--mono);
+  font-size: 11px; line-height: 1.9; padding: 14px 16px;
+  resize: none; caret-color: var(--teal); tab-size: 2;
+}
+#editor::placeholder { color: var(--t4); font-size: 10.5px; }
+.editor-foot {
+  padding: 8px 16px; border-top: 1px solid var(--glass-border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.e-meta { font-family: var(--mono); font-size: 9.5px; color: var(--t3); }
+.file-select {
+  width: 100%; margin-top: 8px; padding: 6px 8px;
+  border: 1px solid var(--glass-border); border-radius: 6px;
+  background: var(--bg2); color: var(--t2); font: 10px var(--mono); outline: none;
+}
+.live-control { display: flex; align-items: center; gap: 6px; color: var(--t3); font-size: 10px; cursor: pointer; }
+.live-control input { accent-color: var(--teal); }
+.graph-search {
+  position: absolute; top: 16px; left: 16px; z-index: 20; width: min(240px, 35%);
+  background: rgba(8,12,20,0.88); border: 1px solid var(--glass-border);
+  border-radius: 7px; padding: 8px 10px; color: var(--t1); font: 11px var(--ui); outline: none;
+}
+.graph-search:focus { border-color: var(--teal-20); }
+
+/* ══════════════════════════════════════════
+   CYTOSCAPE GRAPH
+══════════════════════════════════════════ */
+#cy {
+  position: absolute; inset: 0;
+  background: transparent;
+}
+
+/* Empty overlay */
+#empty-overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px; pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(20,245,212,0.03) 0%, transparent 70%);
+}
+.eo-pulse {
+  width: 80px; height: 80px; border-radius: 50%;
+  border: 1px solid rgba(20,245,212,0.15);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.eo-pulse::before {
+  content: ''; position: absolute; inset: -12px;
+  border: 1px solid rgba(20,245,212,0.06);
+  border-radius: 50%; animation: spin 10s linear infinite;
+}
+.eo-pulse::after {
+  content: ''; position: absolute; inset: -24px;
+  border: 1px dashed rgba(20,245,212,0.03);
+  border-radius: 50%; animation: spin 16s linear infinite reverse;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.eo-icon { font-size: 28px; opacity: 0.4; }
+.eo-title { font-size: 15px; font-weight: 500; color: var(--t2); letter-spacing: -0.3px; }
+.eo-hint { font-size: 11px; color: var(--t3); }
+.eo-kbd {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--mono); font-size: 10px;
+  color: var(--t3);
+}
+.kbd {
+  background: var(--bg2); border: 1px solid var(--glass-border);
+  border-radius: 4px; padding: 1px 5px; font-size: 10px; font-family: var(--mono);
+}
+
+/* Failure banner */
+#fail-bar {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: none; align-items: center; gap: 12px;
+  padding: 10px 18px;
+  background: linear-gradient(90deg, rgba(244,63,94,0.14), transparent);
+  border-bottom: 1px solid rgba(244,63,94,0.18);
+  backdrop-filter: blur(12px);
+  z-index: 30; font-size: 12px;
+}
+#fail-bar.on { display: flex; }
+.fb-tag { font-size: 10px; color: var(--t3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+.fb-name { color: var(--red); font-weight: 650; }
+.fb-count { color: var(--amber); font-size: 11px; }
+
+/* Node detail — full-height drawer anchored to the right edge of
+   the graph area. No tiny internal scroll boxes: the whole drawer
+   scrolls as one piece if content is tall, so everything is always
+   reachable without fighting a nested scroll region. */
+#node-detail {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  width: 280px;
+  display: flex; flex-direction: column;
+  background: rgba(8,12,20,0.94);
+  border-left: 1px solid var(--glass-border);
+  z-index: 40;
+  backdrop-filter: blur(32px) saturate(1.5);
+  box-shadow: -24px 0 64px rgba(0,0,0,0.35);
+}
+#node-detail { display: none; }
+#node-detail.on { display: flex; }
+.nd-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 18px 0;
+  flex-shrink: 0;
+}
+.nd-top-label { font-size: 10px; font-weight: 600; color: var(--t3); letter-spacing: 0.08em; text-transform: uppercase; }
+.nd-scroll { overflow-y: auto; padding: 14px 18px 18px; flex: 1; min-height: 0; }
+.nd-hd { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.nd-ico { font-size: 28px; line-height: 1; flex-shrink: 0; margin-top: 1px; }
+.nd-title-wrap { flex: 1; min-width: 0; }
+.nd-name { font-size: 15px; font-weight: 650; letter-spacing: -0.3px; color: var(--t1); line-height: 1.3; word-break: break-word; }
+.nd-label { font-size: 10.5px; color: var(--t3); margin-top: 3px; font-family: var(--mono); }
+.nd-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 6px 0; gap: 10px; }
+.nd-k { font-size: 10.5px; color: var(--t3); font-weight: 500; flex-shrink: 0; }
+.nd-v { font-family: var(--mono); font-size: 10.5px; color: var(--t2); text-align: right; word-break: break-word; }
+.nd-sep { height: 1px; background: var(--glass-border); margin: 14px 0; }
+.nd-section-label { font-size: 10.5px; color: var(--t3); font-weight: 500; margin-bottom: 9px; display: flex; align-items: center; justify-content: space-between; }
+.nd-conn-count { font-family: var(--mono); font-size: 9.5px; color: var(--t4); }
+/* Connections as a clean vertical list, one per row — never wraps
+   into an overlapping chip cloud, and the drawer's own scroll (not
+   a nested one) handles overflow for long lists. */
+.conn-list { display: flex; flex-direction: column; gap: 4px; }
+.conn-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: 9px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-hover);
+  font-size: 11px; color: var(--t2);
+  cursor: pointer; transition: all 0.12s;
+}
+.conn-row:hover { border-color: var(--teal-20); color: var(--teal); background: var(--teal-10); }
+.conn-dir { font-size: 10px; color: var(--t4); flex-shrink: 0; width: 12px; text-align: center; }
+.conn-icon { flex-shrink: 0; font-size: 13px; }
+.conn-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nd-actions { display: flex; gap: 6px; padding: 14px 18px; border-top: 1px solid var(--glass-border); flex-shrink: 0; }
+
+/* Graph controls */
+#graph-controls {
+  position: absolute; bottom: 20px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 2px;
+  background: rgba(8,12,20,0.85);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px; padding: 5px;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.04) inset;
+  z-index: 20;
+}
+.gc-sep { width: 1px; height: 18px; background: var(--glass-border); margin: 0 4px; }
+.gc-info {
+  font-family: var(--mono); font-size: 9.5px;
+  color: var(--t4); padding: 0 8px; white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+#layout-label {
+  font-family: var(--mono); font-size: 9.5px;
+  color: var(--t3); padding: 0 8px; min-width: 72px; text-align: center;
+}
+
+/* Legend */
+#legend {
+  position: absolute; bottom: 20px; right: 16px;
+  background: rgba(8,12,20,0.85);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px; padding: 12px 14px;
+  backdrop-filter: blur(20px); z-index: 20;
+}
+.leg-title { font-size: 9px; font-weight: 600; color: var(--t4); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+.leg-row { display: flex; align-items: center; gap: 8px; font-size: 10.5px; color: var(--t2); margin-bottom: 5px; }
+.leg-row:last-child { margin-bottom: 0; }
+.leg-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ══════════════════════════════════════════
+   RIGHT PANEL — TABS
+══════════════════════════════════════════ */
+.tabs {
+  display: flex; padding: 0 14px;
+  border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+.tab {
+  padding: 12px 10px 10px;
+  font-size: 11.5px; font-weight: 500;
+  color: var(--t3); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.14s; white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+  letter-spacing: -0.1px;
+}
+.tab:hover { color: var(--t2); }
+.tab.on { color: var(--t1); border-bottom-color: var(--teal); }
+.tbadge {
+  background: var(--red); color: white;
+  border-radius: 4px; padding: 1px 5px;
+  font-size: 8.5px; font-weight: 650; min-width: 16px; text-align: center;
+}
+.tpane { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.tpane.on { display: flex; }
+
+/* Resource cards */
+.r-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; margin-bottom: 2px;
+  border-radius: 10px; border: 1px solid transparent;
+  cursor: pointer; transition: all 0.12s;
+}
+.r-card:hover { background: var(--glass-hover); border-color: var(--glass-border); }
+.r-card.on { background: var(--teal-10); border-color: var(--teal-20); }
+.r-card.imp { background: var(--red-10); border-color: rgba(244,63,94,0.25); animation: card-blink 1.6s ease infinite; }
+@keyframes card-blink { 0%,100%{opacity:1} 50%{opacity:0.6} }
+.r-ico { font-size: 20px; flex-shrink: 0; line-height: 1; }
+.r-body { flex: 1; min-width: 0; }
+.r-name { font-size: 12px; font-weight: 500; letter-spacing: -0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.r-meta { font-family: var(--mono); font-size: 9.5px; color: var(--t3); margin-top: 2px; }
+.r-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+/* Risk cards */
+.rk-card {
+  padding: 10px 12px; margin-bottom: 4px; border-radius: 10px;
+  background: var(--glass-hover); border: 1px solid var(--glass-border);
+  border-left-width: 2px; cursor: pointer; transition: all 0.12s;
+}
+.rk-card:hover { background: rgba(255,255,255,0.04); }
+.rk-card.high  { border-left-color: var(--red); }
+.rk-card.medium{ border-left-color: var(--amber); }
+.rk-card.info  { border-left-color: var(--blue); }
+.rk-sev { font-family: var(--mono); font-size: 9px; font-weight: 500; letter-spacing: 0.1em; margin-bottom: 5px; text-transform: uppercase; }
+.rk-card.high  .rk-sev { color: var(--red); }
+.rk-card.medium .rk-sev { color: var(--amber); }
+.rk-card.info  .rk-sev { color: var(--blue); }
+.rk-msg { font-size: 11.5px; line-height: 1.5; color: var(--t1); }
+.rk-fix-btn { margin-top: 7px; font-size: 10px; color: var(--t3); cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.rk-fix-btn:hover { color: var(--teal); }
+.rk-fix { display: none; margin-top: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; }
+.rk-fix.on { display: block; }
+.rk-fix pre { font-family: var(--mono); font-size: 9.5px; color: rgba(74,222,128,0.88); line-height: 1.75; overflow-x: auto; white-space: pre; }
+
+/* ══════════════════════════════════════════
+   AGENT CHAT
+══════════════════════════════════════════ */
+.chat-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.msg { display: flex; flex-direction: column; gap: 4px; }
+.msg.u { align-items: flex-end; }
+.msg.a { align-items: flex-start; }
+.bubble {
+  max-width: 90%; padding: 10px 14px;
+  font-size: 12.5px; line-height: 1.6; border-radius: 14px;
+}
+.msg.u .bubble { background: var(--teal); color: #031a14; font-weight: 500; border-bottom-right-radius: 4px; }
+.msg.a .bubble { background: var(--bg2); border: 1px solid var(--glass-border); color: var(--t1); border-bottom-left-radius: 4px; }
+.steps-wrap { max-width: 90%; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); border-radius: 10px; overflow: hidden; margin-top: 4px; }
+.steps-hd { padding: 6px 10px; font-size: 10px; color: var(--t3); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: color 0.12s; }
+.steps-hd:hover { color: var(--teal); }
+.steps-body { display: none; border-top: 1px solid var(--glass-border); padding: 8px; }
+.steps-body.on { display: block; }
+.step { display: flex; gap: 6px; padding: 3px 5px; font-family: var(--mono); font-size: 9.5px; border-radius: 5px; margin-bottom: 2px; }
+.step.tc { background: rgba(167,139,250,0.1); color: var(--violet); }
+.step.tr { background: rgba(20,245,212,0.05); color: rgba(20,245,212,0.6); }
+.tok { font-family: var(--mono); font-size: 9px; color: var(--t4); padding: 0 4px; }
+.typing { display: flex; gap: 4px; align-items: center; padding: 12px 16px; background: var(--bg2); border: 1px solid var(--glass-border); border-radius: 14px; border-bottom-left-radius: 4px; width: fit-content; }
+.td { width: 5px; height: 5px; border-radius: 50%; background: var(--teal); animation: td 1.2s ease infinite; }
+.td:nth-child(2){animation-delay:.18s}.td:nth-child(3){animation-delay:.36s}
+@keyframes td{0%,60%,100%{transform:scale(0.6);opacity:0.3}30%{transform:scale(1.1);opacity:1}}
+.qps { padding: 8px 10px; border-top: 1px solid var(--glass-border); display: flex; flex-wrap: wrap; gap: 5px; flex-shrink: 0; }
+.qp { padding: 4px 11px; border-radius: 20px; border: 1px solid var(--glass-border); background: transparent; font-size: 10.5px; color: var(--t2); cursor: pointer; transition: all 0.12s; white-space: nowrap; }
+.qp:hover { border-color: var(--teal-20); color: var(--teal); background: var(--teal-10); }
+.chat-in-row { padding: 10px 12px; border-top: 1px solid var(--glass-border); display: flex; gap: 7px; flex-shrink: 0; }
+#chat-in { flex: 1; background: var(--bg2); border: 1px solid var(--glass-border); border-radius: 10px; color: var(--t1); font-family: var(--ui); font-size: 12.5px; padding: 8px 12px; resize: none; outline: none; min-height: 36px; max-height: 96px; line-height: 1.5; transition: border-color 0.15s; }
+#chat-in:focus { border-color: var(--teal-20); box-shadow: 0 0 0 3px var(--teal-10); }
+#chat-in::placeholder { color: var(--t4); }
+.agent-lock { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; }
+.al-icon { font-size: 24px; opacity: 0.2; }
+.al-title { font-size: 13px; font-weight: 500; color: var(--t2); letter-spacing: -0.2px; }
+.al-sub { font-size: 11.5px; color: var(--t3); line-height: 1.65; }
+.ci { font-family: var(--mono); font-size: 10.5px; color: var(--teal); background: var(--teal-10); border: 1px solid var(--teal-20); padding: 1px 6px; border-radius: 5px; }
+
+/* Tooltip */
+#tip { position: fixed; background: rgba(8,12,20,0.94); border: 1px solid var(--glass-border); border-radius: 10px; padding: 8px 12px; z-index: 1000; pointer-events: none; opacity: 0; transition: opacity 0.08s; backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+#tip.on { opacity: 1; }
+#tip-name { font-size: 12px; font-weight: 600; color: var(--t1); letter-spacing: -0.2px; }
+#tip-type { font-family: var(--mono); font-size: 9.5px; color: var(--t3); margin-top: 2px; }
+#tip-hint { font-size: 10px; color: var(--t2); margin-top: 4px; }
+
+.nodata { padding: 24px 16px; text-align: center; font-size: 11px; color: var(--t4); }
+
+/* Cytoscape custom node/edge rendering is handled via stylesheet in JS */
+</style>
+</head>
+<body>
+<div id="shell">
+
+<!-- HEADER -->
+<div id="hdr">
+  <div class="logo">
+    <div class="logo-mark">⬡</div>
+    <span class="logo-text">Bicep Twin</span>
+    <span class="logo-badge">v4</span>
+  </div>
+
+  <div class="hdr-div"></div>
+
+  <div id="hdr-stats" style="display:none">
+    <div class="hstat"><div class="hstat-n" id="st-r">0</div><div class="hstat-l">Resources</div></div>
+    <div class="hstat"><div class="hstat-n" id="st-e">0</div><div class="hstat-l">Edges</div></div>
+    <div class="hstat"><div class="hstat-n red" id="st-ri">0</div><div class="hstat-l">Risks</div></div>
+    <div class="hstat" id="st-vnet" style="display:none">
+      <div class="hstat-vnet"><span class="vnet-dot" id="vnet-dot"></span><span style="font-size:11px;color:var(--t2);font-weight:500">VNet</span></div>
+    </div>
+  </div>
+
+  <div class="hdr-right">
+    <button class="btn btn-ghost btn-sm" id="btn-export" title="Export graph JSON">Export</button>
+    <button class="btn btn-ghost btn-sm" id="btn-ex">Load example</button>
+    <button class="btn btn-ghost btn-sm" id="btn-rst">Reset</button>
+    <button class="btn btn-primary" id="btn-go">Analyze →</button>
+  </div>
+</div>
+
+<!-- BODY -->
+<div id="body">
+
+  <!-- LEFT: editor -->
+  <div id="left">
+    <div class="ph" style="display:flex;align-items:center;justify-content:space-between">
+      <div style="width:100%">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span class="ph-label">Bicep Template</span>
+          <span id="lc" style="font-family:var(--mono);font-size:9.5px;color:var(--t4)">0L</span>
+        </div>
+        <select class="file-select" id="file-select" aria-label="Bicep file"><option value="">Unsaved document</option></select>
+      </div>
+    </div>
+    <div id="editor-wrap">
+      <textarea id="editor" spellcheck="false"
+        placeholder="// Paste your Bicep template here&#10;// or click Load example&#10;&#10;resource vnet 'Microsoft.Network/&#10;  virtualNetworks@2023-04-01' = {&#10;  name: '${appName}-vnet'&#10;  ...&#10;}"></textarea>
+    </div>
+    <div class="editor-foot">
+      <span class="e-meta" id="e-status">No template loaded</span>
+      <label class="live-control"><input type="checkbox" id="live-mode" checked> Live</label>
+    </div>
+  </div>
+
+  <!-- CENTER: graph -->
+  <div id="center">
+    <div id="cy"></div>
+    <input class="graph-search" id="graph-search" placeholder="Filter resources" aria-label="Filter resources">
+
+    <!-- Empty state -->
+    <div id="empty-overlay">
+      <div class="eo-pulse"><div class="eo-icon">⬡</div></div>
+      <div class="eo-title">No infrastructure loaded</div>
+      <div class="eo-hint">Paste a Bicep template and click Analyze</div>
+      <div class="eo-kbd"><span class="kbd">⌘</span><span class="kbd">↵</span><span style="margin-left:4px">to analyze</span></div>
+    </div>
+
+    <!-- Failure simulation banner -->
+    <div id="fail-bar">
+      <span class="fb-tag">Failure sim</span>
+      <span class="fb-name" id="fb-name"></span>
+      <span class="fb-count" id="fb-count"></span>
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto" id="fb-close">Dismiss</button>
+    </div>
+
+    <!-- Node detail -->
+    <div id="node-detail">
+      <div class="nd-top">
+        <span class="nd-top-label">Resource detail</span>
+        <button class="btn btn-ghost btn-icon btn-sm" id="nd-close">✕</button>
+      </div>
+      <div class="nd-scroll">
+        <div class="nd-hd">
+          <div class="nd-ico" id="nd-ico"></div>
+          <div class="nd-title-wrap">
+            <div class="nd-name" id="nd-name"></div>
+            <div class="nd-label" id="nd-label"></div>
+          </div>
+        </div>
+        <div class="nd-row"><span class="nd-k">Type</span><span class="nd-v" id="nd-type"></span></div>
+        <div class="nd-row"><span class="nd-k">API version</span><span class="nd-v" id="nd-api"></span></div>
+        <div class="nd-row"><span class="nd-k">Layer</span><span class="nd-v" id="nd-layer"></span></div>
+        <div class="nd-sep"></div>
+        <div class="nd-section-label"><span>Connected to</span><span class="nd-conn-count" id="nd-conn-count"></span></div>
+        <div class="conn-list" id="nd-conns"></div>
+      </div>
+      <div class="nd-actions">
+        <button class="btn btn-danger btn-sm" style="flex:1" id="nd-fail-btn">⚡ Simulate failure</button>
+      </div>
+    </div>
+
+    <!-- Controls toolbar -->
+    <div id="graph-controls">
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="cyZoomIn()">＋</button>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="cyZoomOut()">－</button>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="cyFit()" title="Fit to screen">⊡</button>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="relayout()" title="Re-layout">↺</button>
+      <div class="gc-sep"></div>
+      <span id="layout-label">dagre</span>
+      <div class="gc-sep"></div>
+      <span class="gc-info">Scroll to zoom · Drag to pan</span>
+    </div>
+
+    <!-- Legend -->
+    <div id="legend">
+      <div class="leg-title">Categories</div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--c-compute)"></div>Compute</div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--c-network)"></div>Network</div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--c-storage)"></div>Storage</div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--c-ai)"></div>AI</div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--c-security)"></div>Security</div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--c-database)"></div>Database</div>
+      <div style="height:1px;background:var(--glass-border);margin:8px 0"></div>
+      <div class="leg-row" style="opacity:0.7"><div class="leg-dot" style="background:transparent;border:1px dashed var(--t3)"></div>Existing · out of scope</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: tabs -->
+  <div id="right">
+    <div class="tabs">
+      <div class="tab on" data-t="resources">Resources</div>
+      <div class="tab" data-t="risks">Risks <span class="tbadge" id="rb" style="display:none">0</span></div>
+      <div class="tab" data-t="agent">Agent</div>
+    </div>
+    <div class="tpane on" data-t="resources"><div class="scroll" id="r-list"><div class="nodata">No resources</div></div></div>
+    <div class="tpane" data-t="risks"><div class="scroll" id="rk-list"><div class="nodata">No risks detected</div></div></div>
+    <div class="tpane" data-t="agent">
+      <div class="agent-lock" id="a-lock">
+        <div class="al-icon">🔐</div>
+        <div class="al-title">Agent offline</div>
+        <div class="al-sub">Add <span class="ci">LLM_API_KEY</span> and <span class="ci">LLM_MODEL</span> to <span class="ci">.env</span>, then restart the server.</div>
+      </div>
+      <div class="chat-body" id="chat-body" style="display:none"></div>
+      <div class="qps" id="qps" style="display:none">
+        <div class="qp" data-q="Analyze the critical risks in this architecture">Critical risks</div>
+        <div class="qp" data-q="What happens if the VNet fails? Show me the full impact">Failure sim</div>
+        <div class="qp" data-q="Are any resources publicly exposed?">Public exposure</div>
+        <div class="qp" data-q="Is this infrastructure production-ready?">Prod readiness</div>
+      </div>
+      <div class="chat-in-row" id="ci-row" style="display:none">
+        <textarea id="chat-in" rows="1" placeholder="Ask the agent…"></textarea>
+        <button class="btn btn-primary btn-icon btn-sm" id="c-send" style="align-self:flex-end;padding:8px 11px">↑</button>
+        <button class="btn btn-ghost btn-icon btn-sm" id="c-clr" style="align-self:flex-end" title="Clear">↺</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /body -->
+</div><!-- /shell -->
+
+<div id="tip"><div id="tip-name"></div><div id="tip-type"></div><div id="tip-hint"></div></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const API = '';
+const CC = {
+  compute:'#14f5d4', network:'#60a5fa', storage:'#fbbf24',
+  ai:'#c084fc', security:'#f87171', database:'#34d399',
+  messaging:'#f472b6', unknown:'#6b7280'
+};
+const SVC = { high:'#f43f5e', medium:'#f59e0b', low:'#facc15', info:'#60a5fa' };
+
+function LAYER_LABEL(l) { return l === 0 ? 'Hub' : `Ring ${l}`; }
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+const S = {
+  nodes: [], edges: [], risks: [],
+  sel: null, imp: new Set(), fail: false,
+  ready: false, agentOn: false,
+  document: { path:null, revision:null, dirty:false },
+};
+let cy = null; // Cytoscape instance
+let liveTimer = null;
+let analysisSequence = 0;
+
+// ═══════════════════════════════════════════════════════════
+// CYTOSCAPE SETUP
+// ═══════════════════════════════════════════════════════════
+function initCy() {
+  cy = cytoscape({
+    container: document.getElementById('cy'),
+    elements: [],
+    style: buildCyStyle(),
+    layout: { name: 'preset' },
+    zoomingEnabled: true,
+    userZoomingEnabled: true,
+    panningEnabled: true,
+    userPanningEnabled: true,
+    boxSelectionEnabled: false,
+    autounselectify: true,
+    wheelSensitivity: 0.35,
+  });
+
+  // Hover tooltip
+  cy.on('mouseover', 'node', e => {
+    const d = e.target.data();
+    const pos = e.renderedPosition;
+    const cont = document.getElementById('cy').getBoundingClientRect();
+    document.getElementById('tip-name').textContent = d.label || d.id;
+    document.getElementById('tip-type').textContent = d.resourceType || '';
+    document.getElementById('tip-hint').textContent = 'Click to inspect · Shift+click to simulate failure';
+    const tip = document.getElementById('tip');
+    tip.style.left = (cont.left + pos.x + 14) + 'px';
+    tip.style.top  = (cont.top  + pos.y - 10) + 'px';
+    tip.classList.add('on');
+  });
+  cy.on('mouseout', 'node', () => document.getElementById('tip').classList.remove('on'));
+
+  cy.on('tap', 'node', e => {
+    if (e.originalEvent && e.originalEvent.shiftKey) {
+      simulateFailure(e.target.id());
+    } else {
+      selectNode(e.target.id());
+    }
+  });
+
+  cy.on('tap', e => {
+    if (e.target === cy) deselect();
+  });
+}
+
+function buildCyStyle() {
+  return [
+    // ── Base node ────────────────────────────────────────
+    {
+      selector: 'node',
+      style: {
+        'shape': 'round-rectangle',
+        'width': 'data(nodeWidth)',
+        'height': 'data(nodeHeight)',
+        'background-color': 'data(bgColor)',
+        'background-opacity': 1,
+        'border-width': 1,
+        'border-color': 'data(borderColor)',
+        'border-opacity': 1,
+        'label': 'data(label)',
+        'text-valign': 'bottom',
+        'text-halign': 'center',
+        'text-margin-y': 6,
+        'color': 'data(textColor)',
+        'font-family': 'Inter, system-ui, sans-serif',
+        'font-size': '10px',
+        'font-weight': '500',
+        'text-max-width': '110px',
+        'text-wrap': 'ellipsis',
+        'overlay-opacity': 0,
+        'transition-property': 'border-color, border-width, background-color, background-opacity, opacity',
+        'transition-duration': '0.15s',
+      }
+    },
+    {
+      selector: 'node.risk-high',
+      style: { 'border-color':'#f43f5e', 'border-width':2, 'shadow-blur':18, 'shadow-color':'#f43f5e', 'shadow-opacity':0.55 }
+    },
+    {
+      selector: 'node.risk-medium',
+      style: { 'border-color':'#f59e0b', 'border-width':2, 'shadow-blur':12, 'shadow-color':'#f59e0b', 'shadow-opacity':0.4 }
+    },
+    // ── Node hover ───────────────────────────────────────
+    {
+      selector: 'node.hover',
+      style: {
+        'border-width': 2,
+        'border-color': 'data(accentColor)',
+      }
+    },
+    // ── Node selected ────────────────────────────────────
+    {
+      selector: 'node.selected',
+      style: {
+        'border-width': 2,
+        'border-color': 'data(accentColor)',
+        'background-opacity': 1,
+      }
+    },
+    // ── Node impacted (failure sim) ───────────────────────
+    {
+      selector: 'node.impacted',
+      style: {
+        'border-color': '#f43f5e',
+        'border-width': 2,
+      }
+    },
+    // ── Hub node (slightly larger) ────────────────────────
+    {
+      selector: 'node.hub',
+      style: {
+        'border-width': 1.5,
+      }
+    },
+    // ── Existing resource (out of scope / context only) ──
+    // Visually receded: lower opacity, no risk emphasis, sits
+    // behind newly-created resources so the deployment's own
+    // resources are what draws the eye first.
+    {
+      selector: 'node.existing',
+      style: {
+        'opacity': 0.72,
+        'z-index': 1,
+        'height': 82,
+      }
+    },
+    {
+      selector: 'node.existing.selected',
+      style: { 'opacity': 1 }
+    },
+    // ── Base edge ────────────────────────────────────────
+    {
+      selector: 'edge',
+      style: {
+        'width': 1.2,
+        'line-color': 'data(lineColor)',
+        'line-opacity': 0.5,
+        'target-arrow-color': 'data(lineColor)',
+        'target-arrow-shape': 'triangle',
+        'target-arrow-size': 6,
+        'arrow-scale': 0.85,
+        'curve-style': 'bezier',
+        'control-point-step-size': 32,
+        'label': '',
+        'overlay-opacity': 0,
+        'transition-property': 'line-opacity, width',
+        'transition-duration': '0.15s',
+      }
+    },
+    // ── Edge touching an existing resource: dashed ────────
+    // Signals "reference to context", not a deploy-time edge.
+    {
+      selector: 'edge.context-ref',
+      style: {
+        'line-style': 'dashed',
+        'line-dash-pattern': [5, 4],
+        'line-opacity': 0.35,
+      }
+    },
+    // ── Edge highlighted ─────────────────────────────────
+    {
+      selector: 'edge.highlighted',
+      style: {
+        'width': 2,
+        'line-opacity': 1,
+        'label': 'depends on',
+        'font-family': 'Geist Mono, SF Mono, monospace',
+        'font-size': '9px',
+        'color': 'data(lineColor)',
+        'text-background-color': '#080c14',
+        'text-background-opacity': 0.85,
+        'text-background-padding': '3px',
+        'text-background-shape': 'roundrectangle',
+      }
+    },
+    // ── Edge impacted ─────────────────────────────────────
+    {
+      selector: 'edge.impacted',
+      style: {
+        'line-color': '#f43f5e',
+        'target-arrow-color': '#f43f5e',
+        'width': 2,
+        'line-opacity': 0.8,
+      }
+    },
+  ];
+}
+
+// ═══════════════════════════════════════════════════════════
+// NODE RENDERING — canvas-drawn card texture via background-image
+// ═══════════════════════════════════════════════════════════
+function makeNodeImage(n, isHub) {
+  const W = isHub ? 136 : 120, H = (n.is_existing ? 82 : (isHub ? 78 : 70));
+  const scale = window.devicePixelRatio || 1;
+  const c = document.createElement('canvas');
+  c.width = W * scale; c.height = H * scale;
+  const g = c.getContext('2d');
+  g.scale(scale, scale);
+
+  const col = CC[n.category] || '#9ca3af';  // brighter fallback than the old #6b7280
+  const isExisting = !!n.is_existing;
+
+  // Background: kept readable even for "existing" nodes — the
+  // outer Cytoscape `.existing` class already dims the whole node
+  // via CSS opacity, so we deliberately do NOT also fade the text/
+  // icon here. Stacking two separate alpha layers (canvas + CSS)
+  // was the bug that made labels like "ACCOUNT" nearly invisible.
+  const bgAlpha = isExisting ? 0.06 : 0.10;
+  const strokeAlpha = isExisting ? 0.30 : 0.30;
+
+  // Background
+  g.fillStyle = hexAlpha(col, bgAlpha);
+  roundRect(g, 0, 0, W, H, 8);
+  g.fill();
+
+  // Dashed border for existing (out-of-scope) resources
+  if (isExisting) {
+    g.setLineDash([4, 3]);
+    g.strokeStyle = hexAlpha(col, 0.45);
+    g.lineWidth = 1.2;
+    roundRect(g, 1, 1, W-2, H-2, 7);
+    g.stroke();
+    g.setLineDash([]);
+  }
+
+  // Top accent stripe
+  g.fillStyle = hexAlpha(col, strokeAlpha);
+  roundRect(g, 0, 0, W, 3, [8,8,0,0]);
+  g.fill();
+
+  // Icon — always full opacity, regardless of existing/created
+  g.font = `${isHub?22:20}px serif`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(n.icon, W/2, H*0.38);
+
+  // Category label — always rendered at full color, never faded.
+  // Visual "this is out of scope" signal comes from the dashed
+  // border + the outer node opacity, not from washing out the text.
+  g.font = `600 ${isHub?10:9}px Inter, system-ui, sans-serif`;
+  g.fillStyle = col;
+  g.textAlign = 'center';
+  g.textBaseline = 'alphabetic';
+  g.fillText(n.label.toUpperCase(), W/2, H*0.66);
+
+  // "existing" tag
+  if (isExisting) {
+    g.font = `500 7.5px "Geist Mono", monospace`;
+    g.fillStyle = 'rgba(255,255,255,0.45)';
+    g.fillText('EXISTING · OUT OF SCOPE', W/2, H*0.86);
+  }
+
+  // Risk dot
+  const nr = S.risks.filter(r => r.resource_symbol === n.symbol_name);
+  if (nr.length) {
+    const severity = ['high','medium','low','info'].find(level => nr.some(r => r.severity === level));
+    const sCol = SVC[severity] || '#f43f5e';
+    g.beginPath(); g.arc(W - 10, 10, 5, 0, Math.PI*2);
+    g.fillStyle = sCol; g.fill();
+    g.font = '700 7px sans-serif'; g.fillStyle = '#fff';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('!', W - 10, 10);
+  }
+
+  return c.toDataURL('image/png');
+}
+
+function hexAlpha(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g2 = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g2},${b},${alpha})`;
+}
+
+function roundRect(g, x, y, w, h, r) {
+  if (typeof r === 'number') r = [r,r,r,r];
+  g.beginPath();
+  g.moveTo(x+r[0], y);
+  g.lineTo(x+w-r[1], y); g.arcTo(x+w, y, x+w, y+r[1], r[1]);
+  g.lineTo(x+w, y+h-r[2]); g.arcTo(x+w, y+h, x+w-r[2], y+h, r[2]);
+  g.lineTo(x+r[3], y+h); g.arcTo(x, y+h, x, y+h-r[3], r[3]);
+  g.lineTo(x, y+r[0]); g.arcTo(x, y, x+r[0], y, r[0]);
+  g.closePath();
+}
+
+// ═══════════════════════════════════════════════════════════
+// BFS HIERARCHY (same logic, adapted for Cytoscape)
+// ═══════════════════════════════════════════════════════════
+function buildHierarchy(nodes, edges) {
+  const adj = {};
+  nodes.forEach(n => adj[n.symbol_name] = new Set());
+  edges.forEach(e => {
+    if (adj[e.from]) adj[e.from].add(e.to);
+    if (adj[e.to])   adj[e.to].add(e.from);
+  });
+  let hub = nodes.find(n => n.label === 'VNet');
+  if (!hub) {
+    let max = -1;
+    nodes.forEach(n => { const d = (adj[n.symbol_name]||new Set()).size; if(d>max){max=d;hub=n;} });
+  }
+  if (!hub) hub = nodes[0];
+  const layer = {}; layer[hub.symbol_name] = 0;
+  const q = [hub.symbol_name];
+  while (q.length) {
+    const cur = q.shift();
+    for (const nb of adj[cur]||[]) {
+      if (!(nb in layer)) { layer[nb] = layer[cur]+1; q.push(nb); }
+    }
+  }
+  let maxL = 0; Object.values(layer).forEach(l => { if(l>maxL) maxL=l; });
+  nodes.forEach(n => { if(!(n.symbol_name in layer)) layer[n.symbol_name] = maxL+1; });
+  return { hub, layer };
+}
+
+// ═══════════════════════════════════════════════════════════
+// BUILD CYTOSCAPE ELEMENTS
+// ═══════════════════════════════════════════════════════════
+function buildElements(nodes, edges) {
+  const { hub, layer } = buildHierarchy(nodes, edges);
+
+  const els = [];
+
+  nodes.forEach(n => {
+    const col  = CC[n.category] || '#6b7280';
+    const lyr  = layer[n.symbol_name] ?? 0;
+    const isHub = n.symbol_name === hub.symbol_name;
+    const degree = edges.filter(e => e.from === n.symbol_name || e.to === n.symbol_name).length;
+    const nodeWidth = Math.min(156, (isHub ? 136 : 120) + Math.min(degree, 4) * 5);
+    const nodeHeight = n.is_existing ? 82 : Math.min(88, (isHub ? 78 : 70) + Math.min(degree, 4) * 3);
+    const nodeRisks = S.risks.filter(r => r.resource_symbol === n.symbol_name);
+    const severity = ['high','medium','low','info'].find(level => nodeRisks.some(r => r.severity === level));
+    n._layer = lyr;
+
+    const img = makeNodeImage(n, isHub);
+
+    els.push({
+      group: 'nodes',
+      data: {
+        id: n.symbol_name,
+        label: n.name || n.symbol_name,
+        icon: n.icon,
+        category: n.category,
+        resourceType: n.resource_type,
+        apiVersion: n.api_version,
+        accentColor: col,
+        bgColor: 'transparent',  // we use background-image
+        borderColor: hexAlpha(col, 0.3),
+        textColor: hexAlpha(col, 0.85),
+        lineColor: hexAlpha(col, 0.6),
+        isExisting: !!n.is_existing,
+        kind: n.kind || 'resource',
+        _layer: lyr,
+        _isHub: isHub,
+        _nodeData: n,
+        nodeWidth,
+        nodeHeight,
+      },
+      classes: [isHub ? 'hub' : '', n.is_existing ? 'existing' : '', severity ? `risk-${severity}` : ''].filter(Boolean).join(' '),
+      style: {
+        'background-image': img,
+        'background-fit': 'cover',
+        'background-clip': 'none',
+        'background-color': hexAlpha(col, 0.08),
+      }
+    });
+  });
+
+  edges.forEach((e, i) => {
+    const fn = nodes.find(n => n.symbol_name === e.from);
+    const tn = nodes.find(n => n.symbol_name === e.to);
+    const col = fn ? (CC[fn.category] || '#6b7280') : '#6b7280';
+    const touchesExisting = !!(fn && fn.is_existing) || !!(tn && tn.is_existing);
+    els.push({
+      group: 'edges',
+      data: {
+        id: `edge:${e.from}:${e.to}:${e.relation || 'depends_on'}`,
+        source: e.from,
+        target: e.to,
+        lineColor: hexAlpha(col, 0.45),
+      },
+      classes: touchesExisting ? 'context-ref' : '',
+    });
+  });
+
+  return els;
+}
+
+// ═══════════════════════════════════════════════════════════
+// LAYOUT — dagre hierarchical (top-down), with isolated /
+// disconnected nodes (typically `existing` context resources
+// with no captured edge) placed in a tidy, wrapped grid below
+// the connected graph. The camera is always fit to show every
+// single node — nothing should ever require manual panning.
+// ═══════════════════════════════════════════════════════════
+function runLayout(name='dagre') {
+  if (!cy) return;
+  document.getElementById('layout-label').textContent = name;
+
+  const isolated = cy.nodes().filter(n => n.degree() === 0);
+  const connected = cy.nodes().not(isolated);
+  const connectedEles = connected.union(cy.edges());
+
+  const opts = name === 'dagre' ? {
+    name: 'dagre',
+    rankDir: 'TB',          // top → bottom
+    rankSep: 100,            // vertical spacing between ranks
+    nodeSep: 60,             // horizontal spacing within rank
+    edgeSep: 22,
+    ranker: 'network-simplex',
+    animate: false,
+    padding: 48,
+    fit: false,
+    boundingBox: undefined,
+  } : {
+    name: 'cose',
+    animate: false,
+    nodeRepulsion: () => 11000,
+    idealEdgeLength: () => 140,
+    padding: 48,
+    fit: false,
+  };
+
+  if (connected.length) {
+    connectedEles.layout(opts).run();
+  }
+
+  if (isolated.length) {
+    placeIsolatedGrid(isolated, connected);
+  }
+
+  fitAll();
+}
+
+// Fit the camera so every node is visible — called after layout,
+// after the panel toggles (since #center resizes), and on window
+// resize. Cytoscape needs a resize() first whenever the container
+// box has changed, otherwise fit() computes against a stale size.
+function fitAll() {
+  if (!cy) return;
+  cy.resize();
+  cy.fit(cy.elements(), 70);
+}
+
+// Lay out degree-0 nodes ("existing" context resources with no
+// captured edge) in a compact, wrapped grid placed BELOW the
+// connected graph, horizontally centered on it and capped to a
+// maximum row width so it never becomes wider than the connected
+// graph itself (which is what pushes nodes outside the viewport).
+function placeIsolatedGrid(isolated, connected) {
+  const bb = connected.length
+    ? connected.boundingBox()
+    : { x1: 0, x2: 600, y1: 0, y2: 0 };
+
+  const cellW = 158, cellH = 110;
+  const n = isolated.length;
+
+  // Cap row width to the connected graph's width (min 3 per row) so
+  // the isolated block never extends further than the main graph.
+  const connectedWidth = Math.max(bb.x2 - bb.x1, cellW * 3);
+  const maxPerRow = Math.max(3, Math.floor(connectedWidth / cellW));
+  const idealPerRow = Math.ceil(Math.sqrt(n));
+  const perRow = Math.min(maxPerRow, Math.max(idealPerRow, 1));
+  const rows = Math.ceil(n / perRow);
+
+  const gridW = perRow * cellW;
+  const gapY = 110;
+
+  const centerX = (bb.x1 + bb.x2) / 2;
+  const startX = centerX - gridW / 2 + cellW / 2;
+  const startY = bb.y2 + gapY;
+
+  isolated.forEach((node, i) => {
+    const col = i % perRow;
+    const row = Math.floor(i / perRow);
+    node.position({
+      x: startX + col * cellW,
+      y: startY + row * cellH,
+    });
+  });
+}
+
+function relayout() {
+  const cur = document.getElementById('layout-label').textContent;
+  runLayout(cur === 'dagre' ? 'cose' : 'dagre');
+}
+
+// ═══════════════════════════════════════════════════════════
+// CAMERA
+// ═══════════════════════════════════════════════════════════
+function cyFit()    { fitAll(); }
+function cyZoomIn() { if(cy) cy.animate({zoom:cy.zoom()*1.25,center:{eles:cy.$(':selected').length?cy.$(':selected'):cy.elements()}},{duration:250}); }
+function cyZoomOut(){ if(cy) cy.animate({zoom:cy.zoom()*0.8},{duration:250}); }
+
+// ═══════════════════════════════════════════════════════════
+// SELECT / HIGHLIGHT / FAILURE
+// ═══════════════════════════════════════════════════════════
+function selectNode(id) {
+  S.sel = id; S.fail = false; S.imp = new Set();
+  document.getElementById('fail-bar').classList.remove('on');
+
+  if (!cy) return;
+  cy.elements().removeClass('selected impacted highlighted');
+  const node = cy.$('#'+id);
+  node.addClass('selected');
+  // Highlight connected edges
+  node.connectedEdges().addClass('highlighted');
+  // Dim everything else
+  cy.elements().not(node).not(node.connectedEdges()).not(node.neighborhood('node')).style('opacity', 0.35);
+  node.style('opacity', 1);
+  node.connectedEdges().style('opacity', 1);
+  node.neighborhood('node').style('opacity', 1);
+
+  updateNodeDetail(id);
+  renderResList();
+  switchTab('resources');
+  // The drawer takes up real width on the right — refit so every
+  // node, including the selected one, stays inside the visible area.
+  fitAll();
+}
+
+function deselect() {
+  S.sel = null; S.fail = false; S.imp = new Set();
+  document.getElementById('node-detail').classList.remove('on');
+  document.getElementById('fail-bar').classList.remove('on');
+  if (cy) {
+    cy.elements().removeClass('selected impacted highlighted');
+    cy.elements().style('opacity', 1);
+  }
+  renderResList();
+  fitAll();
+}
+
+document.getElementById('nd-close').addEventListener('click', deselect);
+document.getElementById('fb-close').addEventListener('click', deselect);
+
+function updateNodeDetail(id) {
+  const n = S.nodes.find(n => n.symbol_name === id);
+  if (!n) return;
+  document.getElementById('node-detail').classList.add('on');
+  document.getElementById('nd-ico').textContent = n.icon;
+  document.getElementById('nd-name').textContent = n.name || id;
+  document.getElementById('nd-label').textContent = n.label + ' · ' + n.category + (n.is_existing ? ' · existing' : (n.kind === 'module' ? ' · module' : ''));
+  document.getElementById('nd-type').textContent = (n.resource_type||'').split('/').pop();
+  document.getElementById('nd-api').textContent = n.api_version || '—';
+  document.getElementById('nd-layer').textContent = LAYER_LABEL(n._layer ?? 0);
+
+  const depTo   = S.edges.filter(e => e.from === id).map(e => e.to);
+  const depFrom = S.edges.filter(e => e.to   === id).map(e => e.from);
+  const all = [...new Set([...depTo, ...depFrom])];
+  document.getElementById('nd-conn-count').textContent = all.length ? `${all.length}` : '';
+  const cc = document.getElementById('nd-conns');
+  if (!all.length) {
+    cc.innerHTML = '<span style="font-size:10.5px;color:var(--t4)">No connections</span>';
+  } else {
+    cc.innerHTML = all.map(sid => {
+      const sn = S.nodes.find(n => n.symbol_name === sid);
+      const col = CC[(sn||{}).category] || '#6b7280';
+      const dir = depTo.includes(sid) ? '→' : '←';
+      return `<div class="conn-row" onclick="selectNode('${sid}')" style="color:${col}">
+        <span class="conn-dir">${dir}</span>
+        <span class="conn-icon">${sn?sn.icon:'📦'}</span>
+        <span class="conn-name">${sn?(sn.name||sid):sid}</span>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('nd-fail-btn').onclick = () => simulateFailure(id);
+}
+
+async function simulateFailure(sym) {
+  try {
+    const r = await fetch(`${API}/api/simulate/${sym}`);
+    const d = await r.json();
+    if (d.error) return;
+    S.fail = true; S.sel = sym;
+    S.imp = new Set([sym, ...d.direct_dependents.map(x=>x.symbol_name), ...d.all_impacted.map(x=>x.symbol_name)]);
+    const nd = S.nodes.find(n => n.symbol_name === sym);
+    document.getElementById('fb-name').textContent = nd?.name || sym;
+    document.getElementById('fb-count').textContent = `→ ${d.impact_count} resources impacted`;
+    document.getElementById('fail-bar').classList.add('on');
+
+    if (cy) {
+      cy.elements().removeClass('selected impacted highlighted');
+      cy.elements().style('opacity', 0.25);
+      for (const id of S.imp) {
+        cy.$('#'+id).addClass('impacted').style('opacity', 1);
+      }
+      cy.edges().forEach(e => {
+        const s = e.source().id(), t = e.target().id();
+        if (S.imp.has(s) && S.imp.has(t)) {
+          e.addClass('impacted').style('opacity', 1);
+        }
+      });
+    }
+    renderResList();
+  } catch(err) { console.error(err); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ANALYZE
+// ═══════════════════════════════════════════════════════════
+function applyAnalysis(d, preserveViewport=false) {
+  const previousPositions = new Map();
+  const previousTopology = new Set();
+  let viewport = null;
+  if (cy) {
+    cy.nodes().forEach(n => previousPositions.set(n.id(), {...n.position()}));
+    cy.elements().forEach(e => previousTopology.add(e.id()));
+    viewport = { zoom:cy.zoom(), pan:{...cy.pan()} };
+  }
+
+  S.nodes = d.graph.nodes.map(n => ({...n}));
+  S.edges = d.graph.edges;
+  S.risks = d.risks;
+  S.document = d.document || S.document;
+  S.imp = new Set(); S.fail = false; S.ready = true;
+
+  if (!cy) initCy();
+  const incoming = buildElements(S.nodes, S.edges);
+  const incomingIds = new Set(incoming.map(element => element.data.id));
+  const topologyChanged = incomingIds.size !== previousTopology.size || [...incomingIds].some(id => !previousTopology.has(id));
+
+  cy.batch(() => {
+    cy.elements().filter(element => !incomingIds.has(element.id())).remove();
+    incoming.forEach(json => {
+      const existing = cy.getElementById(json.data.id);
+      if (existing.length) {
+        existing.json({data:json.data, classes:json.classes || ''});
+        if (json.style) existing.style(json.style);
+      } else {
+        cy.add(json);
+      }
+    });
+  });
+
+  if (topologyChanged || !preserveViewport) {
+    runLayout(document.getElementById('layout-label').textContent || 'dagre');
+  } else {
+    cy.nodes().forEach(n => { if (previousPositions.has(n.id())) n.position(previousPositions.get(n.id())); });
+    cy.zoom(viewport.zoom); cy.pan(viewport.pan);
+  }
+
+  document.getElementById('empty-overlay').style.display = 'none';
+  const sm = d.summary;
+  document.getElementById('hdr-stats').style.display = 'flex';
+  document.getElementById('st-r').textContent = sm.total_resources;
+  document.getElementById('st-e').textContent = sm.total_edges;
+  document.getElementById('st-ri').textContent = d.risks.length;
+  document.getElementById('st-vnet').style.display = 'flex';
+  document.getElementById('vnet-dot').className = 'vnet-dot ' + (sm.has_vnet ? 'ok' : 'err');
+  const highCount = d.risks.filter(r => r.severity === 'high').length;
+  const badge = document.getElementById('rb');
+  badge.textContent = highCount; badge.style.display = highCount > 0 ? 'inline' : 'none';
+  setES(`${S.document.path ? 'Saved' : 'Analyzed'} · ${sm.total_resources} resources · ${d.risks.length} risks`);
+  renderResList(); renderRkList(); activateAgent();
+  if (S.sel && cy.getElementById(S.sel).length) selectNode(S.sel);
+}
+
+async function analyze({live=false, detach=false}={}) {
+  const content = document.getElementById('editor').value.trim();
+  if (!content) return;
+  const btn = document.getElementById('btn-go');
+  if (!live) { btn.classList.add('loading'); btn.textContent = 'Analyzing…'; btn.disabled = true; }
+  else setES(S.document.path ? 'Saving…' : 'Updating graph…');
+  const sequence = ++analysisSequence;
+
+  try {
+    const r = await fetch(`${API}/api/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content,
+        revision: detach ? null : S.document.revision,
+        save: !!S.document.path,
+        detach: detach || (!S.document.path && S.document.revision == null),
+      }),
+    });
+    const d = await r.json();
+    if (sequence !== analysisSequence) return;
+    if (d.error) { setES('⚠ ' + d.error); return; }
+    applyAnalysis(d, live);
+  } catch(err) { setES('⚠ Connection error'); console.error(err); }
+
+  if (!live) { btn.classList.remove('loading'); btn.textContent = 'Analyze →'; btn.disabled = false; }
+}
+
+function setES(m) { document.getElementById('e-status').textContent = m; }
+
+function hexAlpha(hex, alpha) {
+  if (!hex || !hex.startsWith('#')) return hex;
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// PANELS
+// ═══════════════════════════════════════════════════════════
+function renderResList() {
+  const el = document.getElementById('r-list');
+  if (!S.nodes.length) { el.innerHTML = '<div class="nodata">No resources</div>'; return; }
+  el.innerHTML = S.nodes.map(n => {
+    const col = CC[n.category] || '#6b7280';
+    const nr  = S.risks.filter(r => r.resource_symbol === n.symbol_name);
+    const dCol = nr[0] ? SVC[nr[0].severity] : null;
+    const ringL = LAYER_LABEL(n._layer ?? 0);
+    const tag = n.is_existing ? 'existing' : (n.kind === 'module' ? 'module' : ringL);
+    return `<div class="r-card ${S.sel===n.symbol_name?'on':''} ${S.imp.has(n.symbol_name)?'imp':''}"
+      style="${n.is_existing ? 'opacity:0.65' : ''}"
+      onclick="selectNode('${n.symbol_name}')">
+      <div class="r-ico">${n.icon}</div>
+      <div class="r-body">
+        <div class="r-name" style="color:${col}">${n.name||n.symbol_name}</div>
+        <div class="r-meta">${n.label} · ${tag}</div>
+      </div>
+      ${dCol ? `<div class="r-dot" style="background:${dCol};box-shadow:0 0 5px ${dCol}"></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderRkList() {
+  const el = document.getElementById('rk-list');
+  if (!S.risks.length) { el.innerHTML = '<div class="nodata" style="color:var(--green)">✓ No risks detected</div>'; return; }
+  el.innerHTML = S.risks.map((r, i) => `
+    <div class="rk-card ${r.severity}" onclick="selectNode('${r.resource_symbol}')">
+      <div class="rk-sev">${r.severity} / ${r.category}</div>
+      <div class="rk-msg">${r.message}</div>
+      ${r.fix_template ? `
+        <div class="rk-fix-btn" onclick="event.stopPropagation();toggleFix(${i})">
+          <span id="fa-${i}">▶</span> View Bicep fix
+        </div>
+        <div class="rk-fix" id="f-${i}"><pre>${esc(r.fix_template.trim())}</pre></div>` : ''}
+    </div>`).join('');
+}
+
+function toggleFix(i) {
+  const e = document.getElementById('f-'+i); e.classList.toggle('on');
+  document.getElementById('fa-'+i).textContent = e.classList.contains('on') ? '▼' : '▶';
+}
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ═══════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════
+function switchTab(t) {
+  document.querySelectorAll('.tab').forEach(el  => el.classList.toggle('on', el.dataset.t === t));
+  document.querySelectorAll('.tpane').forEach(el => el.classList.toggle('on', el.dataset.t === t));
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.t)));
+
+// ═══════════════════════════════════════════════════════════
+// AGENT
+// ═══════════════════════════════════════════════════════════
+async function activateAgent() {
+  const response = await fetch(`${API}/api/status`);
+  const status = await response.json();
+  S.agentOn = status.agent_ready;
+  document.getElementById('a-lock').style.display = S.agentOn ? 'none' : 'flex';
+  document.getElementById('chat-body').style.display = S.agentOn ? 'flex' : 'none';
+  document.getElementById('qps').style.display = S.agentOn ? 'flex' : 'none';
+  document.getElementById('ci-row').style.display = S.agentOn ? 'flex' : 'none';
+}
+
+async function sendChat(msg) {
+  if (!msg.trim() || !S.agentOn) return;
+  document.getElementById('chat-in').value = '';
+  appendMsg('u', msg);
+  const te = appendTyping();
+  try {
+    const r = await fetch(`${API}/api/chat`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg }),
+    });
+    const d = await r.json();
+    te.remove();
+    if (d.error) { appendMsg('a', '⚠ ' + d.error); return; }
+    appendMsg('a', d.answer, d.steps, d.total_tokens);
+    if (d.analysis) {
+      document.getElementById('editor').value = d.analysis.document.content;
+      document.getElementById('lc').textContent = d.analysis.document.content.split('\n').length + 'L';
+      applyAnalysis(d.analysis, true);
+    }
+  } catch(err) { te.remove(); appendMsg('a', '⚠ Connection error'); }
+}
+
+function appendMsg(role, text, steps, tok) {
+  const area = document.getElementById('chat-body');
+  const d = document.createElement('div'); d.className = `msg ${role}`;
+  let h = `<div class="bubble">${md(text)}</div>`;
+  if (steps) {
+    const ts = steps.filter(s => s.type !== 'answer');
+    if (ts.length) {
+      const id = 's'+Date.now();
+      h += `<div class="steps-wrap"><div class="steps-hd" onclick="tSteps('${id}')">⚙ ${ts.length} tool call${ts.length>1?'s':''}</div><div class="steps-body" id="${id}">${ts.map(s=>`<div class="step ${s.type}">${s.type==='tool_call'?'→':'←'} ${esc(s.content.slice(0,160))}${s.content.length>160?'…':''}</div>`).join('')}</div></div>`;
+    }
+  }
+  if (tok) h += `<div class="tok">${tok} tokens</div>`;
+  d.innerHTML = h; area.appendChild(d); area.scrollTop = area.scrollHeight; return d;
+}
+
+function appendTyping() {
+  const area = document.getElementById('chat-body');
+  const d = document.createElement('div'); d.className = 'msg a';
+  d.innerHTML = '<div class="typing"><div class="td"></div><div class="td"></div><div class="td"></div></div>';
+  area.appendChild(d); area.scrollTop = area.scrollHeight; return d;
+}
+
+function tSteps(id) { document.getElementById(id).classList.toggle('on'); }
+
+function md(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/`(.+?)`/g,`<code style="font-family:var(--mono);font-size:0.88em;color:var(--teal);background:rgba(20,245,212,0.07);padding:1px 4px;border-radius:3px">$1</code>`)
+    .replace(/\n/g,'<br>');
+}
+
+document.getElementById('chat-in').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(e.target.value); }
+});
+document.getElementById('chat-in').addEventListener('input', e => {
+  e.target.style.height = 'auto';
+  e.target.style.height = Math.min(e.target.scrollHeight, 96) + 'px';
+});
+document.getElementById('c-send').addEventListener('click', () => sendChat(document.getElementById('chat-in').value));
+document.getElementById('c-clr').addEventListener('click', async () => {
+  await fetch(`${API}/api/chat/reset`, { method: 'POST' });
+  document.getElementById('chat-body').innerHTML = '';
+});
+document.querySelectorAll('.qp').forEach(q => q.addEventListener('click', () => { switchTab('agent'); sendChat(q.dataset.q); }));
+
+// ═══════════════════════════════════════════════════════════
+// TOOLBAR / TOP BUTTONS
+// ═══════════════════════════════════════════════════════════
+document.getElementById('btn-go').addEventListener('click', analyze);
+document.getElementById('editor').addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') analyze();
+});
+document.getElementById('editor').addEventListener('input', () => {
+  document.getElementById('lc').textContent = document.getElementById('editor').value.split('\n').length + 'L';
+  setES('Modified');
+  clearTimeout(liveTimer);
+  if (document.getElementById('live-mode').checked) {
+    liveTimer = setTimeout(() => analyze({live:true}), 650);
+  }
+});
+
+async function refreshFiles() {
+  const response = await fetch(`${API}/api/files`);
+  const data = await response.json();
+  const select = document.getElementById('file-select');
+  select.innerHTML = '<option value="">Unsaved document</option>' + data.files.map(path => `<option value="${esc(path)}">${esc(path)}</option>`).join('');
+  select.value = S.document.path || '';
+}
+
+document.getElementById('file-select').addEventListener('change', async event => {
+  if (!event.target.value) return;
+  const response = await fetch(`${API}/api/document`, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:event.target.value}),
+  });
+  const data = await response.json();
+  if (data.error) { setES('⚠ ' + data.error); return; }
+  document.getElementById('editor').value = data.document.content;
+  document.getElementById('lc').textContent = data.document.content.split('\n').length + 'L';
+  applyAnalysis(data);
+});
+
+document.getElementById('graph-search').addEventListener('input', event => {
+  const query = event.target.value.trim().toLowerCase();
+  if (!cy) return;
+  cy.nodes().forEach(node => {
+    const data = node.data();
+    const matches = !query || `${data.id} ${data.label} ${data.resourceType} ${data.category}`.toLowerCase().includes(query);
+    node.style('opacity', matches ? 1 : 0.12);
+  });
+  cy.edges().style('opacity', query ? 0.12 : 1);
+});
+
+document.getElementById('btn-export').addEventListener('click', async () => {
+  const response = await fetch(`${API}/api/graph`);
+  const data = await response.json();
+  if (data.error) { setES('⚠ ' + data.error); return; }
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}));
+  const link = document.createElement('a'); link.href = url; link.download = 'bicep-graph.json'; link.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('btn-ex').addEventListener('click', async () => {
+  try {
+    const r = await fetch(`${API}/api/example`);
+    const d = await r.json();
+    if (d.content) {
+      S.document = {path:null, revision:null, dirty:true};
+      document.getElementById('file-select').value = '';
+      document.getElementById('editor').value = d.content;
+      document.getElementById('lc').textContent = d.content.split('\n').length + 'L';
+      setES('Example loaded');
+      analyze({detach:true});
+    }
+  } catch(e) { console.error(e); }
+});
+
+document.getElementById('btn-rst').addEventListener('click', () => {
+  S.nodes = []; S.edges = []; S.risks = [];
+  S.sel = null; S.imp = new Set(); S.fail = false;
+  S.ready = false; S.agentOn = false;
+  S.document = {path:null, revision:null, dirty:false};
+  if (cy) cy.elements().remove();
+  document.getElementById('editor').value = '';
+  document.getElementById('file-select').value = '';
+  document.getElementById('lc').textContent = '0L';
+  document.getElementById('hdr-stats').style.display = 'none';
+  document.getElementById('empty-overlay').style.display = 'flex';
+  document.getElementById('node-detail').classList.remove('on');
+  document.getElementById('fail-bar').classList.remove('on');
+  document.getElementById('r-list').innerHTML = '<div class="nodata">No resources</div>';
+  document.getElementById('rk-list').innerHTML = '<div class="nodata">No risks detected</div>';
+  document.getElementById('rb').style.display = 'none';
+  setES('No template loaded');
+});
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('resize', () => { if (S.ready) fitAll(); });
+initCy();
+refreshFiles().catch(console.error);
+</script>
+</body>
+</html>
