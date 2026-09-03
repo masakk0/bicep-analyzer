@@ -1,4 +1,5 @@
 # Bicep Twin
+<img width="791" height="395" alt="image" src="https://github.com/user-attachments/assets/dd4b41c1-47b9-41d2-b6f8-18a3c33daa8b" />
 
 Bicep Twin is a local web application for exploring Azure Bicep templates. It parses a template into an infrastructure graph, identifies configurable architectural risks, visualizes resource dependencies, and provides an optional LLM assistant with controlled graph and document tools.
 
